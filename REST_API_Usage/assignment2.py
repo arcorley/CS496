@@ -191,7 +191,7 @@ class SlipHandler(webapp2.RequestHandler):
                 existingNumber = 1
                 break
 
-        if (numberVar == None or arrival_date == ""): #set up a response if incomplete data is sent
+        if (numberVar == None): #set up a response if incomplete data is sent
             self.response.headers.add('Content-Type', 'Application/JSON')
             self.response.headers.add('Status', '400 Bad Request')
             r = {}
