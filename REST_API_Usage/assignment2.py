@@ -238,6 +238,35 @@ class SlipHandler(webapp2.RequestHandler):
             self.response.write(json.dumps(results)) #respond with array of JSON objects
     # [END get handler]
 
+    # [START patch handler]
+    def patch(self, id): #update request handler
+        s = ndb.Key(urlsafe=id).get() #get the existing slip by id
+        slip_data = json.loads(self.request.body) #get the request parameters
+
+        continueVar = 0
+
+        #Check if any fields were sent to be updated
+        if ('number' in slip_data.keys()): #if name is one of the fields requested to change, do this
+            s.number = slip_data['number']
+            continueVar = 1
+
+        if (continueVar == 1): #if the number field was updated, continue
+            s.put() #commmit the changes to the slip
+
+            s_d = s.to_dict() #add the self link for the response
+            s_d['self'] = "/slips/" + id
+
+            self.response.headers.add('Status', '200 OK')
+            self.response.headers.add('Content-Type', 'Application/JSON')
+            self.response.write(json.dumps(s_d)) #send the response
+        else: #if no update field was sent, send an error message
+            self.response.headers.add('Content-Type', 'Application/JSON')
+            self.response.headers.add('Status', '400 Bad Request')
+            r = {}
+            r['message'] = "No fields submitted to update"
+            self.response.write(json.dumps(r))            
+    # [END patch handler]
+
 # [END SlipHandler]
 
 # [START main_page]
