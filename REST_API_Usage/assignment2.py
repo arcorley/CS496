@@ -47,10 +47,11 @@ class BoatHandler(webapp2.RequestHandler):
 
         if (nameVar == "" or typeVar == "" or lengthVar == None): #set up a response if incomplete data is sent
             self.response.headers.add('Content-Type', 'Application/JSON')
-            self.response.headers.add('Status', '400 Bad Request')
+            self.response.set_status(400)
             r = {}
             r['message'] = "Incomplete data sent"
             self.response.write(json.dumps(r))
+            return
         else: #if complete data is supplied, 
             new_boat = Boat(id="", name=nameVar, type=typeVar, length=lengthVar, at_sea=True) #assign values 
             new_boat.put() #save the fields we have
@@ -58,9 +59,10 @@ class BoatHandler(webapp2.RequestHandler):
             new_boat.put() #save the id to the boat we created
             boat_dict = new_boat.to_dict() #convert to a dictionary
             boat_dict['self'] = '/boats/' + new_boat.key.urlsafe() #add self element to dictionary
-            self.response.headers.add('Status', '200 OK')
+            self.response.set_status(200)
             self.response.headers.add('Content-Type', 'Application/JSON')
             self.response.write(json.dumps(boat_dict)) #send back the results
+            return
     # [END post handler]
 
     # [START get handler]
@@ -69,9 +71,10 @@ class BoatHandler(webapp2.RequestHandler):
             b = ndb.Key(urlsafe=id).get() #get the boat object referred to by that id
             b_d = b.to_dict() #convert to a dictionary
             b_d['self'] = "/boats/" + id #create the self link
-            self.response.headers.add('Status', '200 OK')
+            self.response.set_status(200)
             self.response.headers.add('Content-Type', 'Application/JSON')            
             self.response.write(json.dumps(b_d)) #send back the results
+            return
         else: #if no id is given, use this
             results = [] #create array to store query results
             qry = Boat.query()
@@ -80,9 +83,10 @@ class BoatHandler(webapp2.RequestHandler):
                 x_d = x.to_dict()
                 x_d['self'] = "/boats/" + x.key.urlsafe()
                 results.append(x_d) #add the dictionary to results
-            self.response.headers.add('Status', '200 OK')
+            self.response.set_status(200)
             self.response.headers.add('Content-Type', 'Application/JSON')
             self.response.write(json.dumps(results)) #respond with array of JSON objects
+            return
     # [END get handler]
 
     # [START patch handler]
@@ -111,15 +115,17 @@ class BoatHandler(webapp2.RequestHandler):
             b_d = b.to_dict() #add the self link for the response
             b_d['self'] = "/boats/" + id
 
-            self.response.headers.add('Status', '200 OK')
+            self.response.set_status(200)
             self.response.headers.add('Content-Type', 'Application/JSON')
             self.response.write(json.dumps(b_d)) #send the response
+            return
         else: #if no update field was sent, send an error message
             self.response.headers.add('Content-Type', 'Application/JSON')
-            self.response.headers.add('Status', '400 Bad Request')
+            self.response.set_status(400)
             r = {}
             r['message'] = "No fields submitted to update"
-            self.response.write(json.dumps(r))            
+            self.response.write(json.dumps(r))
+            return            
     # [END patch handler]
 
     # [START put handler]
@@ -147,6 +153,28 @@ class BoatHandler(webapp2.RequestHandler):
         else:
             at_sea = True
 
+        if (at_sea == False):
+            if (b.at_sea == True):
+                self.response.set_status(400)
+                self.response.headers.add('Content-Type', 'Application/JSON')
+                r = {}
+                r['message'] = "Received at_sea = false for a boat that is currently at sea"
+                self.response.write(json.dumps(r))
+                return
+        else: #at_sea handling. requires coordination with slips
+            if (b.at_sea == False): #if current boat is not at sea, empty the slip it's in
+                qry = Slip.query()
+                qryResults = qry.fetch()
+                for x in qryResults:
+                    if (x.current_boat == b.id):
+                        slipId = x.id
+                        break
+
+                s = ndb.Key("Slip", long(slipId)).get() #get the slip object this boat is located in
+                s.current_boat = "" #empty the slip
+                s.arrival_date = ""
+                s.put()
+
         b.name = nameVar #assign new values to the boat
         b.type = typeVar
         b.length = lengthVar
@@ -157,7 +185,10 @@ class BoatHandler(webapp2.RequestHandler):
         b_d = b.to_dict() #write the self link
         b_d['self'] = "/boats/" + id
 
+        self.response.set_status(200)
+        self.response.headers.add('Content-Type', 'Application/JSON')
         self.response.write(json.dumps(b_d)) #send the response
+        return
     # [END put handler]
 
     # [START delete handler]
@@ -178,8 +209,9 @@ class BoatHandler(webapp2.RequestHandler):
             s.arrival_date = ""      
             s.put()
 
-        self.response.headers.add('Status', '200 OK')
+        self.response.set_status(200)
         ndb.Key(urlsafe=id).delete()
+        return
     # [END delete handler]
 
 # [END BoatHandler]
@@ -190,12 +222,12 @@ class SlipHandler(webapp2.RequestHandler):
     def post(self): #post request handler
         slip_data = json.loads(self.request.body) #grab the body of the request
 
-        if ('number' in slip_data.keys()): #handle name update
+        if ('number' in slip_data.keys()): #handle number entry
             numberVar = slip_data['number']
         else:
             numberVar = None
 
-        if ('arrival_date' in slip_data.keys()): #handle length update
+        if ('arrival_date' in slip_data.keys()): #handle arrival date entry
             arrival_date = slip_data['arrival_date']
         else:
             arrival_date = ""
@@ -211,14 +243,15 @@ class SlipHandler(webapp2.RequestHandler):
 
         if (numberVar == None): #set up a response if incomplete data is sent
             self.response.headers.add('Content-Type', 'Application/JSON')
-            self.response.headers.add('Status', '400 Bad Request')
+            self.response.set_status(400)
             r = {}
             r['message'] = "Incomplete data sent"
             self.response.write(json.dumps(r))
+            return
         else: #if complete data is supplied
             if (existingNumber == 1): #if slip number already exists, return an error
                 self.response.headers.add('Content-Type', 'Application/JSON')
-                self.response.headers.add('Status', '400 Bad Request')
+                self.response.set_status(400)
                 r = {}
                 r['message'] = "The slip number provided already exists"
                 self.response.write(json.dumps(r))
@@ -229,9 +262,10 @@ class SlipHandler(webapp2.RequestHandler):
                 new_slip.put() #save the id to the boat we created
                 slip_dict = new_slip.to_dict() #convert to a dictionary
                 slip_dict['self'] = '/slips/' + new_slip.key.urlsafe() #add self element to dictionary
-                self.response.headers.add('Status', '200 OK')
+                self.response.set_status(200)
                 self.response.headers.add('Content-Type', 'Application/JSON')
                 self.response.write(json.dumps(slip_dict)) #send back the results
+                return
     # [END post handler]
 
     # [START get handler]
@@ -240,9 +274,15 @@ class SlipHandler(webapp2.RequestHandler):
             s = ndb.Key(urlsafe=id).get() #get the boat object referred to by that id
             s_d = s.to_dict() #convert to a dictionary
             s_d['self'] = "/slips/" + id #create the self link
-            self.response.headers.add('Status', '200 OK')
+            if (s.current_boat != ""):
+                b = ndb.Key("Boat", long(s.current_boat)).get()
+                s_d['boat_url'] = "/boats/" + b.key.urlsafe()
+            else:
+                s_d['boat_url'] = ""
+            self.response.set_status(200)
             self.response.headers.add('Content-Type', 'Application/JSON')            
             self.response.write(json.dumps(s_d)) #send back the results
+            return
         else: #if no id is given, use this
             results = [] #create array to store query results
             qry = Slip.query()
@@ -250,15 +290,16 @@ class SlipHandler(webapp2.RequestHandler):
             for x in qryResults: #for each result, serialize the output so it can be sent to JSON
                 x_d = x.to_dict()
                 x_d['self'] = "/slips/" + x.key.urlsafe()
-                if (x.current_boat != ""): #if a new boat was passed in
+                if (x.current_boat != ""): 
                     b = ndb.Key("Boat", long(x.current_boat)).get()
-                    x_d['boat_in_slip'] = "/boats/" + b.key.urlsafe()
+                    x_d['boat_url'] = "/boats/" + b.key.urlsafe()
                 else:
-                    x_d['boat_in_slip'] = ""
+                    x_d['boat_url'] = ""
                 results.append(x_d) #add the dictionary to results
-            self.response.headers.add('Status', '200 OK')
+            self.response.set_status(200)
             self.response.headers.add('Content-Type', 'Application/JSON')
             self.response.write(json.dumps(results)) #respond with array of JSON objects
+            return
     # [END get handler]
 
     # [START patch handler]
@@ -279,15 +320,17 @@ class SlipHandler(webapp2.RequestHandler):
             s_d = s.to_dict() #add the self link for the response
             s_d['self'] = "/slips/" + id
 
-            self.response.headers.add('Status', '200 OK')
+            self.response.set_status(200)
             self.response.headers.add('Content-Type', 'Application/JSON')
             self.response.write(json.dumps(s_d)) #send the response
+            return
         else: #if no update field was sent, send an error message
             self.response.headers.add('Content-Type', 'Application/JSON')
-            self.response.headers.add('Status', '400 Bad Request')
+            self.response.set_status(200)
             r = {}
             r['message'] = "No fields submitted to update"
-            self.response.write(json.dumps(r))            
+            self.response.write(json.dumps(r))
+            return            
     # [END patch handler]
 
     # [START put handler]
@@ -303,7 +346,7 @@ class SlipHandler(webapp2.RequestHandler):
         else:
             contineVar = 0
             numberVar = None
-            self.response.headers.add('Status', '400 Bad Request')
+            self.response.set_status(400)
             self.response.headers.add('Content-Type', 'Application/JSON')
             r = {}
             r['message'] = "Request didn't contain a slip number"
@@ -318,7 +361,7 @@ class SlipHandler(webapp2.RequestHandler):
             dateVar = ""
         else:
             continueVar = 0
-            self.response.headers.add('Status', '400 Bad Request')
+            self.response.set_status(400)
             self.response.headers.add('Content-Type', 'Application/JSON')
             r = {}
             r['message'] = "current_boat and arrival_date must both be provided or must both be empty"
@@ -340,7 +383,7 @@ class SlipHandler(webapp2.RequestHandler):
                         break
 
             if (existingNumber == 1): #if the slip number exists, return an error
-                self.response.headers.add('Status', '400 Bad Request')
+                self.response.set_status(400)
                 self.response.headers.add('Content-Type', 'Application/JSON')
                 r = {}
                 r['message'] = "The slip number provided already exists"
@@ -354,7 +397,7 @@ class SlipHandler(webapp2.RequestHandler):
             if (s.current_boat == ""): #if field is currently empty
                 if (boatVar != ""): #if requested field is not empty. if it is empty, we can just leave it alone
                     s.current_boat = boatVar #update the slip with the new id
-                    b = ndb.Key("Boat", long(s.current_boat)).get() #get the boat with the id passed in
+                    b = ndb.Key("Boat", long(boatVar)).get() #get the boat with the id passed in
                     b.at_sea = False #update the boat's at_sea field
                     b.put()
             else: #if there is currently a boat in the slip
@@ -379,14 +422,14 @@ class SlipHandler(webapp2.RequestHandler):
             #add the links to the response
             s_d = s.to_dict()
             s_d['self'] = "/slips/" + id #add the self link
-            s_d['boat_in_slip'] = ""
+            s_d['boat_url'] = ""
 
             if (boatVar != ""): #if a new boat was passed in
                 b = ndb.Key("Boat", long(boatVar)).get()
-                s_d['boat_in_slip'] = "/boats/" + b.key.urlsafe()
+                s_d['boat_url'] = "/boats/" + b.key.urlsafe()
 
             #send the response
-            self.response.headers.add('Status', '200 OK')
+            self.response.set_status(200)
             self.response.headers.add('Content-Type', 'Application/JSON')
             self.response.write(json.dumps(s_d))
             return
@@ -403,11 +446,137 @@ class SlipHandler(webapp2.RequestHandler):
             b.at_sea = True
             b.put()
 
-        self.response.headers.add('Status', '200 OK')
+        self.response.set_status(200)
         ndb.Key(urlsafe=id).delete()
+        return
     # [END delete handler]    
 
 # [END SlipHandler]
+
+# [START BoatLocationHandler]
+class BoatLocationHandler(webapp2.RequestHandler):
+
+    # [START delte handler]
+    def delete(self, id):
+        if id: #if an id is given, use this
+            b = ndb.Key(urlsafe=id).get() #get the boat object referred to by that id
+
+            if (b.at_sea == True): #if the boat is already at sea, return an error
+                self.response.set_status(400)
+                self.response.headers.add('Content-Type', 'Application/JSON')
+                r = {}
+                r['message'] = "The boat in the request is already at sea"
+                self.response.write(json.dumps(r))
+                return
+            else: #otherwise, empty the slip the boat is in and update boat at_sea
+                qry = Slip.query()
+                qryResults = qry.fetch()
+                for x in qryResults:
+                    if (x.current_boat == b.id):
+                        slipId = x.id
+                        break
+
+                s = ndb.Key("Slip", long(slipId)).get() #get the slip that the boat is located in
+                s.current_boat = "" #empty the slip
+                s.arrival_date = ""
+                s.put()
+                b.at_sea = True #set the boat to at sea
+                b.put()
+
+                b_d = b.to_dict() #convert to a dictionary
+                b_d['self'] = "/boats/" + id #create the self link
+                self.response.set_status(200)
+                self.response.headers.add('Content-Type', 'Application/JSON')
+                self.response.write(json.dumps(b_d))
+                return
+        else:
+            self.response.set_status(400)
+            self.response.headers.add('Content-Type', 'Application/JSON')
+            r = {}
+            r['message'] = "Didn't receive an ID in the request"
+            self.response.write(json.dumps(r))
+            return
+    # [END delete handler]
+
+    # [START put handler]
+    def put(self, id):
+        if id:
+            b = ndb.Key(urlsafe=id).get() #get the boat object referred to by that id
+            request_data = json.loads(self.request.body) #get the request parameters
+            continueVar = 1
+
+            if (b.at_sea == False): #if the boat is already in a slip return an error
+                continueVar = 0
+                self.response.set_status(400)
+                self.response.headers.add('Content-Type', 'Application/JSON')
+                r = {}
+                r['message'] = "The boat in the request is already in a slip"
+                self.response.write(json.dumps(r))
+                return
+            else: #if the slip number and arrival date are not included return an error
+                if ('slip_number' not in request_data.keys() and 'arrival_date' not in request_data.keys()):
+                    continueVar = 0
+                    self.response.set_status(400)
+                    self.response.headers.add('Content-Type', 'Application/JSON')
+                    r = {}
+                    r['message'] = "slip_number and/or arrival_date not included in request"
+                    self.response.write(json.dumps(r)) 
+                    return
+
+            if (continueVar == 1):
+                #collect the request elements as variables
+                boatId = b.id
+                slipNumber = request_data['slip_number']
+                arrivalDate = request_data['arrival_date']
+                slipId = -1
+
+                qry = Slip.query()
+                qryResults = qry.fetch()
+                for x in qryResults:
+                    if (x.number == slipNumber):
+                        slipId = x.id
+                        break
+
+                if (slipId == -1):
+                    self.response.set_status(400)
+                    self.response.headers.add('Content-Type', 'Application/JSON')
+                    r = {}
+                    r['message'] = "No slip exists with the supplied slip number"
+                    self.response.write(json.dumps(r)) 
+                    return
+
+                s = ndb.Key("Slip", long(slipId)).get() #get the slip that the boat is located in
+
+                if (s.current_boat != ""):
+                    self.response.set_status(403)
+                    self.response.headers.add('Content-Type', 'Application/JSON')
+                    r = {}
+                    r['message'] = "The slip requested is already occupied"
+                    self.response.write(json.dumps(r)) 
+                    return
+
+                s.current_boat = str(boatId)
+                s.arrival_date = arrivalDate
+                s.put()
+                b.at_sea = False
+                b.put()
+
+                b_d = b.to_dict() #convert to a dictionary
+                b_d['self'] = "/boats/" + id #create the self link
+                self.response.set_status(200)
+                self.response.headers.add('Content-Type', 'Application/JSON')
+                self.response.write(json.dumps(b_d))
+
+        else: #return an error if there's no id in the request
+            self.response.set_status(400)
+            self.response.headers.add('Content-Type', 'Application/JSON')
+            r = {}
+            r['message'] = "Didn't receive an ID in the request"
+            self.response.write(json.dumps(r))
+            return 
+    # [END put handler]
+
+# [END BoatLocationHandler]
 
 # [START main_page]
 class MainPage(webapp2.RequestHandler):
@@ -424,8 +593,9 @@ webapp2.WSGIApplication.allowed_methods = new_allowed_methods
 app = webapp2.WSGIApplication([
     ('/', MainPage),
     ('/boats', BoatHandler),
-    ('/boats/(.*)', BoatHandler),
+    ('/boats/([\w|-]*)', BoatHandler),
     ('/slips', SlipHandler),
-    ('/slips/(.*)', SlipHandler)
+    ('/slips/([\w|-]*)', SlipHandler),
+    ('/boats/([\w|-]*)/at_sea', BoatLocationHandler)
 ], debug=True)
 # [END app]
