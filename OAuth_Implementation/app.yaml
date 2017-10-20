@@ -1,0 +1,17 @@
+runtime: python27
+api_version: 1
+threadsafe: true
+
+# [START handlers]
+handlers:
+- url: /static
+  static_dir: static
+- url: /.*
+  script: assignment3.app
+# [END handlers]
+
+libraries:
+  - name: webapp2
+    version: latest
+  - name: jinja2
+    version: latest
