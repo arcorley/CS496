@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
+</head>
+
+<div class="container-fluid">
+	<div class="row" style="padding-top: 40px;">
+		<div class="col-sm-3"></div>
+		<div class="col-sm-6">
+			<p>
+				Congrats! You have landed here after authorizing with google.<br>
+				When Google sent you back here, they passed along a code that we will use to get a token.<br>
+				After we get the token we can FINALLY display your name!<br>
+				Click the button below to get that going.<br>
+			</p>
+		</div>
+		<div class="col-sm-3"></div>
+	</div>
+
+	<div class="row">
+		<div class="col-sm-3"></div>
+		<div class ="col-sm-5">
+			<form id="form_id" method="post" action="https://oauth-2-implementation.appspot.com/name">
+				<input type="hidden" name="state" value="{{ state }}">
+				<input type="hidden" name="token" value="{{ token }}">
+				<button type="button" class="btn btn-primary center-block" onclick="document.getElementById('form_id').submit();">Get My Name!</button>
+			</form>
+		</div>
+		<div class="col-sm-3"></div>
+	</div>
+</div>
